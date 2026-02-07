@@ -1,7 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 
 const DEFAULT_BACKEND_URL = "http://localhost:4000";
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND_URL;
+const RAW_BACKEND_URL = import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND_URL;
+const BACKEND_URL = RAW_BACKEND_URL.replace(/\/+$/, "");
 
 type ApiOptions = {
   auth?: boolean;
@@ -26,7 +27,8 @@ export async function apiPost<T>(path: string, body: unknown, options: ApiOption
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${BACKEND_URL}${path}`, {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const response = await fetch(`${BACKEND_URL}${normalizedPath}`, {
     method: "POST",
     headers,
     body: JSON.stringify(body ?? {}),

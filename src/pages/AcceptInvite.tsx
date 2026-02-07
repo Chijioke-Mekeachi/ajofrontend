@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/layout/Navbar";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Users, CheckCircle2, XCircle, LogIn } from "lucide-react";
+import { apiPost } from "@/lib/backend";
 
 export default function AcceptInvite() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -92,18 +93,10 @@ export default function AcceptInvite() {
       }
 
       // Add user to memberships
-      const { error: membershipError } = await supabase
-        .from("memberships")
-        .insert({
-          ajo_id: group.id,
-          user_id: user.id,
-          position: memberCount + 1,
-          is_active: true,
-        });
-
-      if (membershipError) {
-        if (membershipError.code === "23505") {
-          // Unique violation - already a member
+      try {
+        await apiPost<{ success: boolean; error?: string }>("/api/join-group", { ajo_id: group.id });
+      } catch (error: any) {
+        if (String(error?.message || "").includes("Already a member")) {
           toast({
             title: "Already a member",
             description: "You are already a member of this group.",
@@ -111,7 +104,7 @@ export default function AcceptInvite() {
           navigate(`/dashboard/groups/${group.id}`);
           return;
         }
-        throw membershipError;
+        throw error;
       }
 
       toast({

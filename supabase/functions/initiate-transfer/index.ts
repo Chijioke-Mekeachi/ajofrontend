@@ -130,18 +130,22 @@ serve(async (req) => {
     }
 
     // Record pending ledger entry BEFORE calling Paystack
-    const { error: ledgerError } = await supabaseAdmin.from("ledger").insert({
-      user_id: user.id,
-      type: "withdrawal",
-      amount: -amount,
-      status: "pending",
-      description: `Withdrawal to ${linkedBank.bank_name}`,
-      provider_reference: reference,
-      metadata: {
-        bank_name: linkedBank.bank_name,
-        account_number: linkedBank.account_number,
-      },
-    });
+    const { data: ledgerRow, error: ledgerError } = await supabaseAdmin
+      .from("ledger")
+      .insert({
+        user_id: user.id,
+        type: "withdrawal",
+        amount: -amount,
+        status: "pending",
+        description: `Withdrawal to ${linkedBank.bank_name}`,
+        provider_reference: reference,
+        metadata: {
+          bank_name: linkedBank.bank_name,
+          account_number: linkedBank.account_number,
+        },
+      })
+      .select("id")
+      .single();
 
     if (ledgerError) {
       console.error("Failed to create ledger entry:", ledgerError);
@@ -176,6 +180,10 @@ serve(async (req) => {
     console.log("Paystack transfer response:", paystackData);
 
     if (!paystackData.status) {
+      const paystackMessage = String(paystackData.message || "Transfer initiation failed");
+      const isStarterBusinessRestriction =
+        /starter business/i.test(paystackMessage) && /third party payouts/i.test(paystackMessage);
+
       // Paystack failed - refund the balance and update ledger
       console.error("Paystack transfer failed:", paystackData);
       
@@ -190,8 +198,13 @@ serve(async (req) => {
         .eq("provider_reference", reference);
       
       return new Response(
-        JSON.stringify({ success: false, error: paystackData.message || "Transfer initiation failed" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          success: false,
+          error: isStarterBusinessRestriction
+            ? "Paystack transfers are disabled for your business tier (Starter). Upgrade/verify your Paystack business to enable third‑party payouts."
+            : paystackMessage,
+        }),
+        { status: isStarterBusinessRestriction ? 403 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -210,10 +223,10 @@ serve(async (req) => {
     // Record transaction
     await supabaseAdmin.from("wallet_transactions").insert({
       user_id: user.id,
-      type: "withdrawal",
-      amount: -amount,
+      type: "debit",
+      amount,
       description: `Withdrawal to ${linkedBank.bank_name} - ${linkedBank.account_number}`,
-      reference_id: paystackData.data.id?.toString(),
+      reference_id: ledgerRow?.id ?? null,
     });
 
     console.log("Transfer initiated successfully:", { reference, userId: user.id });

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendNotification } from "@/lib/notifications";
+import { apiPost } from "@/lib/backend";
 
 export interface PublicGroup {
   id: string;
@@ -193,60 +194,19 @@ export function useGroupJoinRequests(groupId: string | undefined) {
     mutationFn: async (requestId: string) => {
       if (!user || !groupId) throw new Error("Missing data");
 
-      // Get the request details
-      const { data: request, error: requestError } = await supabase
-        .from("join_requests")
-        .select("*")
-        .eq("id", requestId)
-        .single();
-
-      if (requestError) throw requestError;
-
-      // Get group name for notification
-      const { data: group } = await supabase
-        .from("ajos")
-        .select("name")
-        .eq("id", groupId)
-        .single();
-
-      // Get current member count to determine position
-      const { count } = await supabase
-        .from("memberships")
-        .select("*", { count: "exact", head: true })
-        .eq("ajo_id", groupId)
-        .eq("is_active", true);
-
-      // Add user to memberships
-      const { error: membershipError } = await supabase
-        .from("memberships")
-        .insert({
-          ajo_id: groupId,
-          user_id: request.user_id,
-          position: (count || 0) + 1,
-          is_active: true,
-        });
-
-      if (membershipError) throw membershipError;
-
-      // Update request status
-      const { error: updateError } = await supabase
-        .from("join_requests")
-        .update({
-          status: "approved",
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: user.id,
-        })
-        .eq("id", requestId);
-
-      if (updateError) throw updateError;
+      const result = await apiPost<{
+        success: boolean;
+        data: { status: string; group_id: string; group_name: string; user_id: string };
+        error?: string;
+      }>("/api/review-join-request", { request_id: requestId, action: "approve" });
 
       // Send notification to the user
       await sendNotification({
-        userId: request.user_id,
+        userId: result.data.user_id,
         type: "group_joined",
         title: "Request Approved! 🎉",
-        message: `Your request to join "${group?.name || "the group"}" has been approved. You're now a member!`,
-        data: { groupId, groupName: group?.name },
+        message: `Your request to join "${result.data.group_name || "the group"}" has been approved. You're now a member!`,
+        data: { groupId: result.data.group_id, groupName: result.data.group_name },
       });
     },
     onSuccess: () => {
@@ -259,42 +219,21 @@ export function useGroupJoinRequests(groupId: string | undefined) {
     mutationFn: async (requestId: string) => {
       if (!user || !groupId) throw new Error("Not authenticated");
 
-      // Get request details first
-      const { data: request } = await supabase
-        .from("join_requests")
-        .select("user_id")
-        .eq("id", requestId)
-        .single();
-
-      // Get group name for notification
-      const { data: group } = await supabase
-        .from("ajos")
-        .select("name")
-        .eq("id", groupId)
-        .single();
-
-      const { error } = await supabase
-        .from("join_requests")
-        .update({
-          status: "rejected",
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: user.id,
-        })
-        .eq("id", requestId);
-
-      if (error) throw error;
+      const result = await apiPost<{
+        success: boolean;
+        data: { status: string; group_id: string; group_name: string; user_id: string };
+        error?: string;
+      }>("/api/review-join-request", { request_id: requestId, action: "reject" });
 
       // Send notification to the user
-      if (request) {
-        await sendNotification({
-          userId: request.user_id,
-          type: "join_request",
-          title: "Join Request Update",
-          message: `Your request to join "${group?.name || "the group"}" was not approved at this time.`,
-          data: { groupId, groupName: group?.name },
-          sendEmail: false, // Don't send email for rejections
-        });
-      }
+      await sendNotification({
+        userId: result.data.user_id,
+        type: "join_request",
+        title: "Join Request Update",
+        message: `Your request to join "${result.data.group_name || "the group"}" was not approved at this time.`,
+        data: { groupId: result.data.group_id, groupName: result.data.group_name },
+        sendEmail: false, // Don't send email for rejections
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["group-join-requests", groupId] });

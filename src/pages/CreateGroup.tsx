@@ -17,9 +17,9 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
+import { apiPost } from "@/lib/backend";
 
 export default function CreateGroup() {
   const navigate = useNavigate();
@@ -56,38 +56,24 @@ export default function CreateGroup() {
     setIsLoading(true);
     
     try {
-      // Create the ajo group
-      const { data: ajo, error: ajoError } = await supabase
-        .from("ajos")
-        .insert({
-          name: formData.name,
-          description: formData.description || null,
-          contribution_amount: parseInt(formData.contributionAmount) * 100, // Convert to kobo
-          cycle_type: formData.cycleType,
-          start_date: formData.startDate,
-          max_members: parseInt(formData.maxMembers),
-          creator_id: user.id,
-          status: "active",
-          current_cycle: 1,
-          is_public: formData.isPublic,
-          fee_percentage: parseFloat(formData.feePercentage),
-        })
-        .select()
-        .single();
+      const contributionAmountNaira = parseInt(formData.contributionAmount);
+      const maxMembers = parseInt(formData.maxMembers);
+      const feePercentage = parseFloat(formData.feePercentage);
 
-      if (ajoError) throw ajoError;
-
-      // Add creator as first member
-      const { error: membershipError } = await supabase
-        .from("memberships")
-        .insert({
-          ajo_id: ajo.id,
-          user_id: user.id,
-          position: 1,
-          is_active: true,
-        });
-
-      if (membershipError) throw membershipError;
+      const result = await apiPost<{
+        success: boolean;
+        data: { group: { id: string; name: string } };
+        error?: string;
+      }>("/api/create-group", {
+        name: formData.name,
+        description: formData.description || null,
+        contribution_amount: contributionAmountNaira * 100,
+        cycle_type: formData.cycleType,
+        start_date: formData.startDate,
+        max_members: maxMembers,
+        is_public: formData.isPublic,
+        fee_percentage: feePercentage,
+      });
 
       // Invalidate groups query to refresh the list
       queryClient.invalidateQueries({ queryKey: ["groups"] });
@@ -97,7 +83,7 @@ export default function CreateGroup() {
         description: "Your Ajo group has been created successfully.",
       });
       
-      navigate(`/dashboard/groups/${ajo.id}`);
+      navigate(`/dashboard/groups/${result.data.group.id}`);
     } catch (error: any) {
       console.error("Error creating group:", error);
       toast({
