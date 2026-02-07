@@ -8,10 +8,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useUserCards } from "@/hooks/useUserCards";
 import { useContributions } from "@/hooks/useContributions";
-import { CreditCard, Loader2, CheckCircle2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useWallet, formatNaira } from "@/hooks/useWallet";
+import { Wallet, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface PayContributionModalProps {
   membershipId: string;
@@ -27,18 +27,14 @@ export function PayContributionModal({
   cycleName,
 }: PayContributionModalProps) {
   const [open, setOpen] = useState(false);
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-  const { cards, isLoading: isLoadingCards } = useUserCards();
-  const { chargeContribution, isCharging } = useContributions(ajoId);
-
-  const formatCurrency = (amount: number) => `₦${(amount / 100).toLocaleString()}`;
+  const { data: wallet, isLoading: isLoadingWallet } = useWallet();
+  const { payContributionFromWallet, isPayingFromWallet } = useContributions(ajoId);
 
   const handlePay = async () => {
     try {
-      await chargeContribution({
+      await payContributionFromWallet({
         membershipId,
         ajoId,
-        cardId: selectedCardId || undefined,
       });
       setOpen(false);
     } catch (error) {
@@ -46,13 +42,14 @@ export function PayContributionModal({
     }
   };
 
-  const defaultCard = cards.find((c) => c.is_default);
+  const balance = wallet?.balance ?? 0;
+  const isInsufficient = balance < contributionAmount;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="gap-2">
-          <CreditCard className="w-4 h-4" />
+          <Wallet className="w-4 h-4" />
           Pay Contribution
         </Button>
       </DialogTrigger>
@@ -60,56 +57,60 @@ export function PayContributionModal({
         <DialogHeader>
           <DialogTitle>Pay Contribution</DialogTitle>
           <DialogDescription>
-            Pay {formatCurrency(contributionAmount)} for {cycleName}
+            Pay {formatNaira(contributionAmount)} for {cycleName} from your wallet
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {isLoadingCards ? (
+          {isLoadingWallet ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
-          ) : cards.length === 0 ? (
-            <div className="text-center py-6">
-              <CreditCard className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No cards saved</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Please add a card in the Cards section first
+          ) : !wallet ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+              <p className="text-sm text-destructive">Wallet not found for your account.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Please visit your Wallet page or contact support if this keeps happening.
               </p>
+              <div className="mt-3">
+                <Button asChild variant="outline">
+                  <Link to="/dashboard/wallet">Go to Wallet</Link>
+                </Button>
+              </div>
             </div>
           ) : (
-            <>
-              <p className="text-sm text-muted-foreground">Select a card to use:</p>
-              <div className="space-y-2">
-                {cards.map((card) => (
-                  <button
-                    key={card.id}
-                    onClick={() => setSelectedCardId(card.id)}
-                    className={cn(
-                      "w-full flex items-center justify-between p-4 rounded-lg border transition-colors",
-                      selectedCardId === card.id || (!selectedCardId && card.is_default)
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/50"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <CreditCard className="w-5 h-5 text-muted-foreground" />
-                      <div className="text-left">
-                        <p className="font-medium text-foreground">
-                          {card.card_brand} •••• {card.card_last4}
-                        </p>
-                        {card.bank_name && (
-                          <p className="text-sm text-muted-foreground">{card.bank_name}</p>
-                        )}
-                      </div>
-                    </div>
-                    {(selectedCardId === card.id || (!selectedCardId && card.is_default)) && (
-                      <CheckCircle2 className="w-5 h-5 text-primary" />
-                    )}
-                  </button>
-                ))}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="text-sm text-muted-foreground">Wallet balance</div>
+                <div className="font-medium text-foreground">{formatNaira(balance)}</div>
               </div>
-            </>
+
+              {isInsufficient ? (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                  <p className="text-sm text-destructive">
+                    Insufficient wallet balance to pay {formatNaira(contributionAmount)}.
+                  </p>
+                  <div className="mt-3">
+                    <Button asChild variant="outline">
+                      <Link to="/dashboard/wallet">Fund Wallet</Link>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">You’ll pay</span>
+                    <span className="font-medium text-foreground">{formatNaira(contributionAmount)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm mt-2">
+                    <span className="text-muted-foreground">Balance after</span>
+                    <span className="font-medium text-foreground">
+                      {formatNaira(balance - contributionAmount)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -119,15 +120,15 @@ export function PayContributionModal({
           </Button>
           <Button
             onClick={handlePay}
-            disabled={isCharging || cards.length === 0}
+            disabled={isPayingFromWallet || isLoadingWallet || !wallet || isInsufficient}
           >
-            {isCharging ? (
+            {isPayingFromWallet ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Processing...
               </>
             ) : (
-              `Pay ${formatCurrency(contributionAmount)}`
+              `Pay ${formatNaira(contributionAmount)}`
             )}
           </Button>
         </div>

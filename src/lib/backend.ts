@@ -34,10 +34,37 @@ export async function apiPost<T>(path: string, body: unknown, options: ApiOption
     body: JSON.stringify(body ?? {}),
   });
 
-  const json = await response.json().catch(() => ({}));
+  let rawText = "";
+  try {
+    rawText = await response.text();
+  } catch {
+    rawText = "";
+  }
+
+  let json: any = {};
+  if (rawText) {
+    try {
+      json = JSON.parse(rawText);
+    } catch {
+      json = {};
+    }
+  }
+
   if (!response.ok) {
-    const errorMessage = json?.error || json?.message || "Request failed";
-    throw new Error(errorMessage);
+    const errorMessage = json?.error || json?.message;
+    const fallbackBody = rawText
+      ? rawText.replace(/\s+/g, " ").trim().slice(0, 200)
+      : null;
+    const statusLabel = `${response.status}${response.statusText ? ` ${response.statusText}` : ""}`.trim();
+
+    if (errorMessage) throw new Error(`${statusLabel}: ${errorMessage}`);
+    if (fallbackBody) throw new Error(`${statusLabel}: ${fallbackBody}`);
+    throw new Error(statusLabel || "Request failed");
+  }
+
+  if (!rawText) return {} as T;
+  if (rawText && Object.keys(json).length === 0) {
+    throw new Error("Invalid JSON response from backend");
   }
 
   return json as T;

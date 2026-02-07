@@ -103,6 +103,33 @@ export function useContributions(ajoId?: string) {
     },
   });
 
+  const payContributionFromWalletMutation = useMutation({
+    mutationFn: async ({ membershipId, ajoId }: { membershipId: string; ajoId: string }) => {
+      const response = await apiPost<{ success: boolean; error?: string; message?: string }>(
+        "/api/pay-contribution-from-wallet",
+        {
+          membership_id: membershipId,
+          ajo_id: ajoId,
+        }
+      );
+
+      if (!response.success) {
+        throw new Error(response.error || "Failed to pay contribution from wallet");
+      }
+
+      return response;
+    },
+    onSuccess: (data) => {
+      toast.success(data.message || "Contribution paid from wallet");
+      queryClient.invalidateQueries({ queryKey: ["contributions"] });
+      queryClient.invalidateQueries({ queryKey: ["user-contributions"] });
+      queryClient.invalidateQueries({ queryKey: ["wallet"] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to pay contribution from wallet");
+    },
+  });
+
   return {
     contributions: historyQuery.data || [],
     userContributions: userContributionsQuery.data || [],
@@ -110,5 +137,7 @@ export function useContributions(ajoId?: string) {
     isLoadingUserContributions: userContributionsQuery.isLoading,
     chargeContribution: chargeContributionMutation.mutateAsync,
     isCharging: chargeContributionMutation.isPending,
+    payContributionFromWallet: payContributionFromWalletMutation.mutateAsync,
+    isPayingFromWallet: payContributionFromWalletMutation.isPending,
   };
 }
