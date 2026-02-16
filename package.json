@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:webview-local": "VITE_WEBVIEW_LOCAL=1 vite build",
+    "sync:mobile-web": "node scripts/sync-mobile-web-build.mjs",
+    "build:mobile": "npm run build:webview-local && npm run sync:mobile-web",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"

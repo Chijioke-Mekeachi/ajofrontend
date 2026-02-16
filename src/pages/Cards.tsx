@@ -81,34 +81,36 @@ export default function Cards() {
         key: publicKey,
         email: user.email || "",
         access_code: data.data.access_code,
-        callback: async (response) => {
-          try {
-            const verify = await apiPost<{ success: boolean; data?: any; error?: string }>(
-              "/api/verify-payment",
-              { reference: response.reference }
-            );
+        callback: (response) => {
+          void (async () => {
+            try {
+              const verify = await apiPost<{ success: boolean; data?: any; error?: string }>(
+                "/api/verify-payment",
+                { reference: response.reference }
+              );
 
-            if (verify?.success && verify?.data?.status === "success") {
+              if (verify?.success && verify?.data?.status === "success") {
+                toast({
+                  title: "Card linked successfully",
+                  description: "Your card has been securely added for automatic debits.",
+                });
+                queryClient.invalidateQueries({ queryKey: ["user-cards"] });
+              } else {
+                toast({
+                  title: "Card verification pending",
+                  description: "Your card is being verified. Please check again shortly.",
+                });
+              }
+            } catch (verifyError: any) {
               toast({
-                title: "Card linked successfully",
-                description: "Your card has been securely added for automatic debits.",
+                title: "Verification failed",
+                description: verifyError.message || "Could not verify card. Please try again.",
+                variant: "destructive",
               });
-              queryClient.invalidateQueries({ queryKey: ["user-cards"] });
-            } else {
-              toast({
-                title: "Card verification pending",
-                description: "Your card is being verified. Please check again shortly.",
-              });
+            } finally {
+              setIsLinking(false);
             }
-          } catch (verifyError: any) {
-            toast({
-              title: "Verification failed",
-              description: verifyError.message || "Could not verify card. Please try again.",
-              variant: "destructive",
-            });
-          } finally {
-            setIsLinking(false);
-          }
+          })();
         },
         onClose: () => {
           setIsLinking(false);

@@ -72,3 +72,15 @@ To connect a domain, navigate to Project > Settings > Domains and click Connect 
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
 # ajofrontend
+
+## Expo WebView Build
+
+Use these commands when embedding the web app into the Expo shell:
+
+```sh
+# production web build
+npm run build
+
+# local-webview build + copy to ../mobile/assets/web
+npm run build:mobile
+```
