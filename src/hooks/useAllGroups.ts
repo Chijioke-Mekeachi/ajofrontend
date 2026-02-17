@@ -13,6 +13,12 @@ export interface AllGroup {
   current_cycle: number | null;
   status: string;
   creator_id: string | null;
+  creatorProfile: {
+    user_id: string;
+    username: string | null;
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
   created_at: string;
   is_public: boolean;
   memberCount: number;
@@ -75,6 +81,31 @@ export function useAllGroups() {
       if (requestsError) throw requestsError;
 
       const requestedGroupIds = pendingRequests?.map((r) => r.ajo_id) || [];
+      const creatorIds = Array.from(
+        new Set(
+          uniqueGroups
+            .map((group) => group.creator_id)
+            .filter((creatorId): creatorId is string => !!creatorId)
+        )
+      );
+
+      const creatorProfilesMap = new Map<
+        string,
+        { user_id: string; username: string | null; full_name: string; avatar_url: string | null }
+      >();
+
+      if (creatorIds.length > 0) {
+        const { data: creatorProfiles, error: creatorProfilesError } = await supabase
+          .from("profiles")
+          .select("user_id, username, full_name, avatar_url")
+          .in("user_id", creatorIds);
+
+        if (creatorProfilesError) throw creatorProfilesError;
+
+        (creatorProfiles || []).forEach((profile) => {
+          creatorProfilesMap.set(profile.user_id, profile);
+        });
+      }
 
       // Enrich groups with counts and user status
       const groupsWithDetails = await Promise.all(
@@ -94,6 +125,9 @@ export function useAllGroups() {
 
           return {
             ...group,
+            creatorProfile: group.creator_id
+              ? creatorProfilesMap.get(group.creator_id) || null
+              : null,
             memberCount: count || 0,
             userPosition: userMembership?.position,
             progress,

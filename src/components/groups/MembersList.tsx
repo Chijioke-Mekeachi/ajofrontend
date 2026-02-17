@@ -24,6 +24,7 @@ export function MembersList({ members, creatorId, currentUserId }: MembersListPr
       {members.map((member) => {
         const isCreator = member.user_id === creatorId;
         const isCurrentUser = member.user_id === currentUserId;
+        const username = member.profile?.username ? `@${member.profile.username}` : null;
         const initials = member.profile?.full_name
           ?.split(" ")
           .map((n) => n[0])
@@ -62,9 +63,12 @@ export function MembersList({ members, creatorId, currentUserId }: MembersListPr
                   <Badge variant="secondary" className="text-xs">You</Badge>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground truncate">
-                {member.profile?.email}
-              </p>
+              {username && (
+                <p className="text-sm text-muted-foreground truncate">{username}</p>
+              )}
+              {member.profile?.email && (
+                <p className="text-xs text-muted-foreground truncate">{member.profile.email}</p>
+              )}
             </div>
 
             <Badge 

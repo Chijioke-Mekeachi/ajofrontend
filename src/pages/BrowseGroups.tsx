@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -22,8 +23,10 @@ import {
   Clock,
   CheckCircle2,
   Loader2,
+  Eye,
 } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { usePublicGroups, useJoinRequest } from "@/hooks/usePublicGroups";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -148,6 +151,21 @@ export default function BrowseGroups() {
                 </div>
               </div>
 
+              <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                <Avatar className="h-7 w-7">
+                  <AvatarImage src={group.creatorProfile?.avatar_url || undefined} />
+                  <AvatarFallback className="text-xs">
+                    {group.creatorProfile?.full_name?.charAt(0)?.toUpperCase() || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate">
+                  Created by{" "}
+                  {group.creatorProfile?.username
+                    ? `@${group.creatorProfile.username}`
+                    : group.creatorProfile?.full_name || "Unknown"}
+                </span>
+              </div>
+
               {group.description && (
                 <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                   {group.description}
@@ -183,95 +201,103 @@ export default function BrowseGroups() {
               </div>
 
               {/* Action */}
-              {group.hasRequested ? (
-                <div className="flex items-center justify-center gap-2 py-2.5 px-4 bg-muted rounded-lg text-muted-foreground">
-                  <Clock className="w-4 h-4" />
-                  <span className="text-sm font-medium">Request Pending</span>
-                </div>
-              ) : group.memberCount >= group.max_members ? (
-                <div className="flex items-center justify-center gap-2 py-2.5 px-4 bg-muted rounded-lg text-muted-foreground">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span className="text-sm font-medium">Group Full</span>
-                </div>
-              ) : (
-                <Dialog
-                  open={selectedGroup === group.id}
-                  onOpenChange={(open) => {
-                    setSelectedGroup(open ? group.id : null);
-                    if (!open) setMessage("");
-                  }}
-                >
-                  <DialogTrigger asChild>
-                    <Button variant="hero" className="w-full">
-                      Request to Join
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Join {group.name}</DialogTitle>
-                      <DialogDescription>
-                        Send a request to join this group. The group admin will
-                        review your request.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            Contribution
-                          </span>
-                          <span className="font-medium">
-                            {formatCurrency(group.contribution_amount)} /{" "}
-                            {group.cycle_type}
-                          </span>
+              <div className="space-y-2">
+                <Button variant="outline" className="w-full" asChild>
+                  <Link to={`/dashboard/groups/${group.id}`}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    View Members
+                  </Link>
+                </Button>
+                {group.hasRequested ? (
+                  <div className="flex items-center justify-center gap-2 py-2.5 px-4 bg-muted rounded-lg text-muted-foreground">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm font-medium">Request Pending</span>
+                  </div>
+                ) : group.memberCount >= group.max_members ? (
+                  <div className="flex items-center justify-center gap-2 py-2.5 px-4 bg-muted rounded-lg text-muted-foreground">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span className="text-sm font-medium">Group Full</span>
+                  </div>
+                ) : (
+                  <Dialog
+                    open={selectedGroup === group.id}
+                    onOpenChange={(open) => {
+                      setSelectedGroup(open ? group.id : null);
+                      if (!open) setMessage("");
+                    }}
+                  >
+                    <DialogTrigger asChild>
+                      <Button variant="hero" className="w-full">
+                        Request to Join
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Join {group.name}</DialogTitle>
+                        <DialogDescription>
+                          Send a request to join this group. The group admin will
+                          review your request.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              Contribution
+                            </span>
+                            <span className="font-medium">
+                              {formatCurrency(group.contribution_amount)} /{" "}
+                              {group.cycle_type}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              Members
+                            </span>
+                            <span className="font-medium">
+                              {group.memberCount} / {group.max_members}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            Members
-                          </span>
-                          <span className="font-medium">
-                            {group.memberCount} / {group.max_members}
-                          </span>
+                        <div className="space-y-2">
+                          <Label htmlFor="message">
+                            Message (optional)
+                          </Label>
+                          <Textarea
+                            id="message"
+                            placeholder="Introduce yourself to the group admin..."
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            rows={3}
+                          />
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="message">
-                          Message (optional)
-                        </Label>
-                        <Textarea
-                          id="message"
-                          placeholder="Introduce yourself to the group admin..."
-                          value={message}
-                          onChange={(e) => setMessage(e.target.value)}
-                          rows={3}
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setSelectedGroup(null)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        variant="hero"
-                        onClick={handleJoinRequest}
-                        disabled={isSubmitting}
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Sending...
-                          </>
-                        ) : (
-                          "Send Request"
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setSelectedGroup(null)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="hero"
+                          onClick={handleJoinRequest}
+                          disabled={isSubmitting}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            "Send Request"
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             </div>
           ))}
         </div>

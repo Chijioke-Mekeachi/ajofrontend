@@ -15,6 +15,12 @@ export interface PublicGroup {
   current_cycle: number | null;
   status: string;
   creator_id: string | null;
+  creatorProfile: {
+    user_id: string;
+    username: string | null;
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
   memberCount: number;
   hasRequested: boolean;
   isMember: boolean;
@@ -31,6 +37,7 @@ export interface JoinRequest {
   profile?: {
     full_name: string;
     email: string;
+    username: string | null;
     avatar_url: string | null;
   };
 }
@@ -50,6 +57,32 @@ export function usePublicGroups() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+
+      const creatorIds = Array.from(
+        new Set(
+          (groups || [])
+            .map((group) => group.creator_id)
+            .filter((creatorId): creatorId is string => !!creatorId)
+        )
+      );
+
+      const creatorProfilesMap = new Map<
+        string,
+        { user_id: string; username: string | null; full_name: string; avatar_url: string | null }
+      >();
+
+      if (creatorIds.length > 0) {
+        const { data: creatorProfiles, error: creatorProfilesError } = await supabase
+          .from("profiles")
+          .select("user_id, username, full_name, avatar_url")
+          .in("user_id", creatorIds);
+
+        if (creatorProfilesError) throw creatorProfilesError;
+
+        (creatorProfiles || []).forEach((profile) => {
+          creatorProfilesMap.set(profile.user_id, profile);
+        });
+      }
 
       // Get member counts and check user's relationship with each group
       const groupsWithDetails = await Promise.all(
@@ -92,6 +125,9 @@ export function usePublicGroups() {
 
           return {
             ...group,
+            creatorProfile: group.creator_id
+              ? creatorProfilesMap.get(group.creator_id) || null
+              : null,
             memberCount: memberCount || 0,
             isMember,
             hasRequested,
@@ -174,13 +210,13 @@ export function useGroupJoinRequests(groupId: string | undefined) {
         (data || []).map(async (request) => {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("full_name, email, avatar_url")
+            .select("full_name, email, username, avatar_url")
             .eq("user_id", request.user_id)
             .single();
 
           return {
             ...request,
-            profile: profile || { full_name: "Unknown", email: "", avatar_url: null },
+            profile: profile || { full_name: "Unknown", email: "", username: null, avatar_url: null },
           } as JoinRequest;
         })
       );

@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ReferralSection } from "@/components/settings/ReferralSection";
 import { ReferralLeaderboard } from "@/components/settings/ReferralLeaderboard";
 import { TwoFactorSection } from "@/components/settings/TwoFactorSection";
@@ -13,7 +14,8 @@ import {
   Building2,
   Save,
   AtSign,
-  Lock
+  Lock,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +31,7 @@ export default function Settings() {
     name: "",
     email: "",
     phone: "",
+    avatarUrl: "",
     bankName: "",
     accountNumber: "",
     accountName: ""
@@ -40,6 +43,7 @@ export default function Settings() {
         name: profile.full_name || "",
         email: profile.email || "",
         phone: profile.phone || "",
+        avatarUrl: profile.avatar_url || "",
         bankName: "",
         accountNumber: "",
         accountName: ""
@@ -59,6 +63,7 @@ export default function Settings() {
       await updateProfile({
         full_name: formData.name,
         phone: formData.phone,
+        avatar_url: formData.avatarUrl.trim() || null,
       });
       toast({
         title: "Settings saved",
@@ -99,6 +104,32 @@ export default function Settings() {
               </h2>
               
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="avatarUrl">Profile Picture</Label>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-14 w-14">
+                      <AvatarImage src={formData.avatarUrl || undefined} />
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                        {formData.name?.charAt(0)?.toUpperCase() || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 relative">
+                      <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Input
+                        id="avatarUrl"
+                        name="avatarUrl"
+                        value={formData.avatarUrl}
+                        onChange={handleChange}
+                        className="pl-11"
+                        placeholder="https://example.com/photo.jpg"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Add an image URL to show your profile picture across groups.
+                  </p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
                   <Input

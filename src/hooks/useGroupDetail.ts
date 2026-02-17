@@ -11,6 +11,7 @@ export interface GroupMember {
   profile?: {
     full_name: string;
     email: string;
+    username: string | null;
     avatar_url: string | null;
   };
 }
@@ -64,13 +65,13 @@ export function useGroupDetail(groupId: string | undefined) {
         (memberships || []).map(async (member) => {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("full_name, email, avatar_url")
+            .select("full_name, email, username, avatar_url")
             .eq("user_id", member.user_id)
             .single();
 
           return {
             ...member,
-            profile: profile || { full_name: "Unknown", email: "", avatar_url: null },
+            profile: profile || { full_name: "Unknown", email: "", username: null, avatar_url: null },
           };
         })
       );
@@ -78,6 +79,23 @@ export function useGroupDetail(groupId: string | undefined) {
       return membersWithProfiles as GroupMember[];
     },
     enabled: !!groupId && !!user,
+  });
+
+  const creatorProfileQuery = useQuery({
+    queryKey: ["group-creator-profile", groupId, groupQuery.data?.creator_id],
+    queryFn: async () => {
+      if (!groupQuery.data?.creator_id) return null;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, username, full_name, avatar_url")
+        .eq("user_id", groupQuery.data.creator_id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!groupId && !!user && !!groupQuery.data?.creator_id,
   });
 
   const invitesQuery = useQuery({
@@ -142,9 +160,10 @@ export function useGroupDetail(groupId: string | undefined) {
 
   return {
     group: groupQuery.data,
+    creatorProfile: creatorProfileQuery.data || null,
     members: membersQuery.data || [],
     invites: invitesQuery.data || [],
-    isLoading: groupQuery.isLoading || membersQuery.isLoading,
+    isLoading: groupQuery.isLoading || membersQuery.isLoading || creatorProfileQuery.isLoading,
     isCreator,
     isMember,
     createInvite,

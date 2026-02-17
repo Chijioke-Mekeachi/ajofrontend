@@ -3,6 +3,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MembersList } from "@/components/groups/MembersList";
 import { InviteMemberModal } from "@/components/groups/InviteMemberModal";
 import { PayContributionModal } from "@/components/groups/PayContributionModal";
@@ -33,6 +34,7 @@ export default function GroupDetail() {
   const { user } = useAuth();
   const {
     group,
+    creatorProfile,
     members,
     invites,
     isLoading,
@@ -129,6 +131,20 @@ export default function GroupDetail() {
                   )}
                 </div>
                 <p className="text-muted-foreground">{group.description || "No description"}</p>
+                <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={creatorProfile?.avatar_url || undefined} />
+                    <AvatarFallback className="text-[10px]">
+                      {creatorProfile?.full_name?.charAt(0)?.toUpperCase() || "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span>
+                    Created by{" "}
+                    {creatorProfile?.username
+                      ? `@${creatorProfile.username}`
+                      : creatorProfile?.full_name || "Unknown"}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -154,6 +170,12 @@ export default function GroupDetail() {
             )}
           </div>
         </div>
+
+        {!isCreator && !isMember && (group as any).is_public && (
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-sm text-primary">
+            You are viewing this public group as a guest. You can review members before requesting to join.
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
